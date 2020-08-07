@@ -67,9 +67,14 @@ def info_process(dic, contract_type):
     return df_options
 
 
-def recommend(dic, contract_type):
+def calculate_delta(dic, df, curr_price):
+    curr_date = datetime.strptime(dic["Target Date"], "%Y-%m-%d")
+
+
+def recommend(dic, contract_type, curr_price):
     """Calculate further information and recommend options."""
     df = info_process(dic, contract_type)
+    calculate_delta(dic, df, curr_price)
     # Calculate maximum number can be bought for each contract.
     df["Number"] = np.floor(dic["Maximum Risk"] * 0.01 / df["Price"])
     df = df[df["Number"] != 0]  # Remove the contracts can not be bought.
@@ -96,7 +101,7 @@ def main(dic):
         contract_type = "Call"
     else:
         contract_type = "Put"
-    df = recommend(dic, contract_type)  # Get recommended options.
+    df = recommend(dic, contract_type, current_price)  # Get recommended options.
     # Text output
     for index, row in df.iterrows():
         print("Long %s: Buy %s x %s $%s %s @ $%s" % (contract_type,
