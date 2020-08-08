@@ -8,6 +8,7 @@ import pandas as pd
 from pandas.tseries.offsets import Week
 from datetime import datetime
 import numpy as np
+import mibian
 
 
 input_dict = {
@@ -30,13 +31,13 @@ def get_options(ticker, exp_date, typ):
     # Tables on the page is read in to a list. The first on is call options and the second one is put options.
     ls = pd.read_html("https://" + url)
     if typ == "Call":
-        df = ls[0][["Strike", "Ask"]]  # Take Strike price and ask price.
+        df = ls[0][["Strike", "Ask", "Implied Volatility"]]  # Take Strike price and ask price.
         ret_df = df.copy()
         # Expiration date column is added
         ret_df["Expiration Date"] = pd.Series([exp_date] * len(df), index=df.index)
         return ret_df
     elif typ == "Put":
-        df = ls[1][["Strike", "Ask"]]  # Take Strike price and ask price.
+        df = ls[1][["Strike", "Ask", "Implied Volatility"]]  # Take Strike price and ask price.
         ret_df = df.copy()
         # Expiration date column is added
         ret_df["Expiration Date"] = pd.Series([exp_date] * len(df), index=df.index)
@@ -63,18 +64,39 @@ def info_process(dic, contract_type):
             # If there is no options available, directly move to next Friday.
             target_date = target_date + Week(weekday=4)
     df_options = pd.concat(ls)  # Concatenate the dataframe into one.
-    df_options.columns = ["Strike", "Price", "Expiration Date"]  # Change column names
+    df_options.columns = ["Strike", "Price", "Volatility", "Expiration Date"]  # Change column names
     return df_options
 
 
-def calculate_delta(dic, df, curr_price):
-    curr_date = datetime.strptime(dic["Target Date"], "%Y-%m-%d")
+def calculate_delta(dic, df, contract_type, curr_price):
+    df["Remaining Days"] = df["Expiration Date"] - datetime.now()
+    if contract_type == "Call":
+        delta_ls = [
+            mibian.BS(
+                [curr_price, dic["Target Price"], dic["Interest Rate"], row["Remaining Days"].days],
+                row["Volatility"][:-1]
+            ) .callDelta
+            for index, row in df.iterrows()
+        ]
+    elif contract_type == "Put":
+        delta_ls = [
+            mibian.BS(
+                [curr_price, dic["Target Price"], dic["Interest Rate"], row["Remaining Days"].days],
+                row["Volatility"][:-1]
+            ).putDelta
+            for index, row in df.iterrows()
+        ]
+    else:
+        raise ValueError
+    df["Delta"] = pd.Series(delta_ls, index=df.index)
+    return df
 
 
 def recommend(dic, contract_type, curr_price):
     """Calculate further information and recommend options."""
     df = info_process(dic, contract_type)
-    calculate_delta(dic, df, curr_price)
+    if dic["Rank"] == "Delta":
+        df = calculate_delta(dic, df, contract_type, curr_price)
     # Calculate maximum number can be bought for each contract.
     df["Number"] = np.floor(dic["Maximum Risk"] * 0.01 / df["Price"])
     df = df[df["Number"] != 0]  # Remove the contracts can not be bought.
@@ -91,7 +113,14 @@ def recommend(dic, contract_type, curr_price):
                     df["Number"] * 100.0 * (df["Strike"] - dic["Target Price"]) - df["Entry Cost"]) / df["Entry Cost"]
 
     df = round(df, 2)  # Round up the numbers
-    df = df.sort_values(by="Estimated Return", ascending=False)  # Sort the dataframe according to the estimated return.
+    if dic["Rank"] == "Return":
+        # Sort the dataframe according to the estimated return.
+        df = df.sort_values(by="Estimated Return", ascending=False)
+    elif dic["Rank"] == "Delta":
+        if contract_type == "Call":
+            df = df.sort_values(by="Delta", ascending=False)
+        if contract_type == "Put":
+            df = df.sort_values(by="Delta")
     return df[:dic["Contract Number"]]  # Return the top options
 
 
@@ -110,6 +139,8 @@ def main(dic):
                                                      row["Strike"],
                                                      contract_type,
                                                      row["Price"]))
+        if dic["Rank"] == "Delta":
+            print("Delta: %s" % row["Delta"])
         print("Entry cost: $%s" % row["Entry Cost"])
         print("Maximum risk: $%s" % row["Entry Cost"])
         print("Est. return at target price: $%s (%s%s)" % (round(row["Estimated Return"] * row["Entry Cost"] * 0.01, 1),
