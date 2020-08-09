@@ -117,6 +117,10 @@ def recommend(dic, contract_type, curr_price):
         # Sort the dataframe according to the estimated return.
         df = df.sort_values(by="Estimated Return", ascending=False)
     elif dic["Rank"] == "Delta":
+        df = df[df["Delta"] >= dic["Delta Range"][0]]
+        df = df[df["Delta"] <= dic["Delta Range"][1]]
+        if len(df) == 0:
+            return pd.DataFrame()
         if contract_type == "Call":
             df = df.sort_values(by="Delta", ascending=False)
         if contract_type == "Put":
@@ -131,6 +135,8 @@ def main(dic):
     else:
         contract_type = "Put"
     df = recommend(dic, contract_type, current_price)  # Get recommended options.
+    if len(df) == 0:
+        print("No option found!")
     # Text output
     for index, row in df.iterrows():
         print("Long %s: Buy %s x %s $%s %s @ $%s" % (contract_type,
