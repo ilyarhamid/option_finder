@@ -73,7 +73,7 @@ def calculate_delta(dic, df, contract_type, curr_price):
     if contract_type == "Call":
         delta_ls = [
             mibian.BS(
-                [curr_price, dic["Target Price"], dic["Interest Rate"], row["Remaining Days"].days],
+                [curr_price, row["Strike"], dic["Interest Rate"], row["Remaining Days"].days],
                 row["Volatility"][:-1]
             ) .callDelta
             for index, row in df.iterrows()
@@ -81,7 +81,7 @@ def calculate_delta(dic, df, contract_type, curr_price):
     elif contract_type == "Put":
         delta_ls = [
             mibian.BS(
-                [curr_price, dic["Target Price"], dic["Interest Rate"], row["Remaining Days"].days],
+                [curr_price, row["Strike"], dic["Interest Rate"], row["Remaining Days"].days],
                 row["Volatility"][:-1]
             ).putDelta
             for index, row in df.iterrows()
