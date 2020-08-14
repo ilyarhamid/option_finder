@@ -12,11 +12,14 @@ import mibian
 
 
 input_dict = {
-    "Ticker": "UAL",  # Ticker of underlying asset
-    "Target Price": 40.0,  # Estimated future price
-    "Target Date": "2020-08-25",  # Estimated time when the price hit target price
-    "Maximum Risk": 500.0,
+    "Ticker": "WMT",  # Ticker of underlying asset;
+    "Target Price": 135.0,  # Estimated future price
+    "Target Date": "2020-08-21",  # Estimated time when the price hit target price
+    "Maximum Risk": 5000.0,
     "Contract Number": 5,  # Number of different options contracts to be recommended
+    "Interest Rate": 1.0,  # interest rate used for delta calculation
+    "Rank": "Delta",  # 'Return' or 'Delta'
+    "Delta Range": (0.4, 0.5)
 }
 
 
